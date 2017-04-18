@@ -33,21 +33,15 @@ foreach ($client->parseEvents() as $event) {
         switch ($message['type']) {
             case 'text':
             if (preg_match('/^@haniwa+[ 　].+$/i', $message['text'])) {
-                $translate = new Translate(MS_TRANSLATOR_KEY);
                 $text = str_replace('@haniwa', '', $message['text']);
                 $text = preg_replace('/^[ 　]+/u', '', $text);
                 mb_regex_encoding("UTF-8");
-                if (preg_match('/^.+[ぁ-んァ-ヶー一-龠].+$/u', $text)) {
-                    //日本語が含まれている時
-                    $result = $translate->translate($text, 'en');
+
+                $translate = new Translate(MS_TRANSLATOR_KEY);
+                if (!judge_language($text)) {
+                    $result = '翻訳可能な文字列を入力してください。';
                 } else {
-                    if (preg_match('/^[!-@[-`{-~0-9\s\t\n]+$/', $text)) {
-                        //翻訳不可能な文字列の時
-                        $result = '翻訳可能な文字列を入力してください。';
-                    } else {
-                        //日本語じゃなくて記号だけの文字列じゃない時
-                        $result = $translate->translate($text, 'ja');
-                    }
+                    $result = $translate->translate($text, judge_language($text));
                 }
                 $client->replyMessage(text_message($event['replyToken'], $result));
                 break;
@@ -62,13 +56,15 @@ foreach ($client->parseEvents() as $event) {
             $cvapi = new ComputerVisionApi(MS_COMPUTER_VISION_KEY, $image_binary);
             $cvdata = $cvapi->request();
             $caption = $cvdata['description']['captions'][0]['text'];
-            if($cvdata['faces'][0]['age'])
-                $age = "\n" . $cvdata['faces'][0]['age'] . "歳";
+
+            if($cvdata['faces']) {
+                $age_gender = age_gender_text($cvdata['faces']);
+            }
 
             $translate = new Translate(MS_TRANSLATOR_KEY);
             $result = $translate->translate($caption, 'ja');
 
-            $client->replyMessage(text_message($event['replyToken'], $caption . "\n" . $result . $age));
+            $client->replyMessage(text_message($event['replyToken'], $caption . "\n" . $result . "\n左から" . $age_gender));
             break;
 
 
@@ -97,5 +93,36 @@ function text_message ($replyToken, $text)
     return $array;
 }
 
+function judge_language ($text)
+{
+    if (preg_match('/^.+[ぁ-んァ-ヶー一-龠].+$/u', $text)) {
+        //日本語が含まれている時
+        return 'en';
+    } else {
+        if (preg_match('/^[!-@[-`{-~0-9\s\t\n]+$/', $text)) {
+            //翻訳不可能な文字列の時
+            return NULL;
+        } else {
+            //日本語じゃなくて記号だけの文字列じゃない時
+            return 'ja';
+        }
+    }
+}
+
+function age_gender_text ($faces)
+{
+    $sort = array();
+    $left = array();
+    $text = '';
+    foreach ($faces as $value) {
+        $left[] = $value['faceRectangle']['left'];
+    }
+    natsort($left);
+    $sort = array_keys($left);
+    foreach ($sort as $value) {
+        $text .= "\n" . $faces[$value]['age'] . "歳" . $faces[$value]['gender'];
+    }
+    return $text;
+}
 
 ?>
