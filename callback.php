@@ -64,7 +64,7 @@ foreach ($client->parseEvents() as $event) {
             $translate = new Translate(MS_TRANSLATOR_KEY);
             $result = $translate->translate($caption, 'ja');
 
-            $client->replyMessage(text_message($event['replyToken'], $caption . "\n" . $result . "\n左から" . $age_gender));
+            $client->replyMessage(text_message($event['replyToken'], $caption . "\n" . $result . $age_gender));
             break;
 
 
@@ -114,6 +114,9 @@ function age_gender_text ($faces)
     $sort = array();
     $left = array();
     $text = '';
+    if (!(count($faces) == 1)) {
+        $text = "\n左から";
+    }
     foreach ($faces as $value) {
         $left[] = $value['faceRectangle']['left'];
     }
